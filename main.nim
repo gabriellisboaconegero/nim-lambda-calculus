@@ -25,11 +25,25 @@ proc Var(variable: string): Term =
 proc App(lhs: Term, rhs: Term): Term =
   return Term(kind: ApplicationKind, lhs: lhs, rhs: rhs)
 
+proc copyTerm(t: Term): Term =
+  case t.kind:
+    of VariableKind:
+      let v = Var(t.variable)
+      v.deBrujinId = t.deBrujinId
+      return v
+    of AbstractionKind:
+      return Abs(t.boundVar, copyTerm(t.body))
+    of ApplicationKind:
+      return App(
+        copyTerm(t.lhs),
+        copyTerm(t.rhs)
+      )
+
 proc termToStr(t: Term, fmtDeBrujin: bool = false): string = 
   case t.kind
     of VariableKind:
       if fmtDeBrujin:
-        return fmt("#{t.deBrujinId}")
+        return fmt("{t.variable}#{t.deBrujinId}")
       else:
         return t.variable
     of AbstractionKind:
@@ -52,32 +66,53 @@ proc bindVariables(t: var Term, boundVar: string, level: int = 0) =
       bindVariables(t.lhs, boundVar, level)
       bindVariables(t.rhs, boundVar, level)
 
-proc fixDeBrujinRepresentation(t: var Term) =
+proc fixDeBrujinRepresentation(t: var Term, dbjiLevel: int = 0) =
+  # echo fmt("fix: {t.kind}")
+  # echo fmt("fix: {termToStr(t, true)}")
   case t.kind
     of VariableKind:
-      return
+      if t.deBrujinId == -1:
+        t.deBrujinId = dbjiLevel
     of AbstractionKind:
       bindVariables(t.body, t.boundVar)
-      fixDeBrujinRepresentation(t.body)
+      fixDeBrujinRepresentation(t.body, dbjiLevel+1)
     of ApplicationKind:
-      fixDeBrujinRepresentation(t.lhs)
-      fixDeBrujinRepresentation(t.rhs)
+      fixDeBrujinRepresentation(t.lhs, dbjiLevel)
+      fixDeBrujinRepresentation(t.rhs, dbjiLevel)
 
-proc substituteBoundVariable(body: Term, val: Term, dbijLevel: int = 0): Term = 
-  # echo fmt("sub: {body.kind} {dbijLevel}")
-  # echo fmt("sub: {termToStr(body)}")
+proc shift(t: var Term, dbjiLevel: int, k: int) =
+  # echo fmt("shift: {termToStr(t, true)} {dbjiLevel} {k}")
+  case t.kind:
+    of VariableKind:
+      if t.deBrujinId > dbjiLevel:
+        t.deBrujinId += k
+    of AbstractionKind:
+      shift(t.body, dbjiLevel+1, k)
+    of ApplicationKind:
+      shift(t.lhs, dbjiLevel, k)
+      shift(t.rhs, dbjiLevel, k)
+
+proc substituteBoundVariable(body: Term, val: Term, dbjiLevel: int = 0): Term = 
+  # echo fmt("sub: {body.kind} {dbjiLevel}")
+  # echo fmt("sub: {termToStr(body, true)}")
   case body.kind:
     of VariableKind:
-      if (dbijLevel == body.deBrujinId):
+      if (dbjiLevel == body.deBrujinId):
         # echo fmt("sub: found bound var {body.variable}")
-        return val
+        var v = copyTerm(val)
+        shift(v, -1, dbjiLevel)
+        # echo fmt("sub: {termToStr(v, true)}")
+
+        return v
+      if (dbjiLevel < body.deBrujinId):
+        body.deBrujinId -= 1
       return body
     of AbstractionKind:
-      return Abs(body.boundVar, substituteBoundVariable(body.body, val, dbijLevel+1))
+      return Abs(body.boundVar, substituteBoundVariable(body.body, val, dbjiLevel+1))
     of ApplicationKind:
       let tmp =  App(
-        substituteBoundVariable(body.lhs, val, dbijLevel),
-        substituteBoundVariable(body.rhs, val, dbijLevel),
+        substituteBoundVariable(body.lhs, val, dbjiLevel),
+        substituteBoundVariable(body.rhs, val, dbjiLevel),
       )
       
       # echo fmt("sub: {termToStr(tmp)}")
@@ -95,16 +130,16 @@ proc step(t: Term): Term =
 
       return t
     of ApplicationKind:
-      let lhs = step(t.lhs)
+      if (t.lhs.kind == AbstractionKind):
+        # echo fmt("step: sub")
+        # echo termToStr(t.rhs)
+        return substituteBoundVariable(t.lhs.body, t.rhs)
 
+      let lhs = step(t.lhs)
       if (lhs != t.lhs):
         # echo fmt("step: lhs changed")
         return App(lhs, t.rhs)
       
-      if (lhs.kind == AbstractionKind):
-        # echo fmt("step: sub")
-        # echo termToStr(t.rhs)
-        return substituteBoundVariable(t.lhs.body, t.rhs)
 
       let rhs = step(t.rhs)
       if (rhs != t.rhs):
@@ -113,28 +148,28 @@ proc step(t: Term): Term =
 
       return t
 
-proc evaluate(t: var Term, show: bool = false): Term = 
+proc evaluate(t: var Term, show: bool = false, showSteps: bool = false, gas: int = high(int)): Term = 
   fixDeBrujinRepresentation(t)
 
   if show:
     echo "==================="
-    echo termToStr(t)
     echo termToStr(t, true)
 
+  var steps = 1
   var nt = step(t)
-  while (t != nt):
-    # if show:
-    #   echo termToStr(nt)
-    #   echo termToStr(nt, true)
+  while (t != nt and steps < gas):
+    if (show and showSteps):
+      echo fmt("step: {termToStr(nt, true)}")
     
     t = nt
     nt = step(t)
 
+    steps += 1
+
   if show:
-    echo termToStr(t)
-    echo termToStr(t, true)
+    echo termToStr(nt, true)
     echo "==================="
-  return t
+  return nt
 
 
 
@@ -162,18 +197,68 @@ var t8 = App(
     )
   )
 )
-var t9 = App(t5, Var("b"))
+var t9 = App(App(t5, Var("b")), Var("hey"))
+var t10 = App(Abs("x", App(Abs("y", Var("y")), Var("x"))), Var("hey"))
+var t11 = Abs("x",
+  App(
+    Abs("y",
+      Abs("z",
+        App(App(Var("x"), Var("y")), Var("z"))
+      )
+    ),
+    Abs("w",
+      Var("x")
+    )
+  )
+)
+
+# (λx. λy. z x (λu. u x)) (λx. w x).
+var t12 = App(
+  Abs("x",
+    Abs("y",
+      App(
+        App(Var("z"), Var("x")),
+        Abs("u",
+          App(Var("u"), Var("x"))
+        )
+      )
+    )
+  ),
+  Abs("x",
+    App(Var("w"), Var("x"))
+  )
+)
+
+var t13 = Abs("x",
+  App(
+    Abs("y",
+      Abs("z",
+        App(App(Var("x"), Var("y")), Var("z"))
+      )
+    ),
+    App(
+      Var("w"),
+      Var("x")
+    )
+  )
+)
+
+var t = t11
 
 discard evaluate(t0, true) # should be: (\x.x)
 discard evaluate(t1, true) # (\x.(x y))
 discard evaluate(t2, true) # (\x.(\y.(x y)))
 discard evaluate(t3, true) # (\y.y)
 discard evaluate(t4, true) # (\y.(\x.(x y)))
-discard evaluate(t5, true) # (\a.(\b.(a (a b)))) / (\a.(\b.(#1 (#1 #0))))
+discard evaluate(t5, true) # (\a.(\b.(a#1 (a#1 b#0))))
 discard evaluate(t6, true) # ((y y) (\x.x))
 # discard evaluate(t7, true) # runs forever
 discard evaluate(t8, true) # (1 (\z.(2 z)))
-discard evaluate(t9, true) # (\b.(b (b b))) / (\b.(#-1 (#-1 #0)))
+discard evaluate(t9, true) # (b#0 (b#0 hey#0))
+discard evaluate(t10, true) # hey#0
+discard evaluate(t11, true) # (\x.(\z.((x#1 (\w.x#2)) z#0)))
+discard evaluate(t12, true) # (\y.((z#1 (\x.(w#2 x#0))) (\u.(u#0 (\x.(w#3 x#0))))))
+discard evaluate(t13, true) # (\x.(\z.((x#1 (w#2 x#1)) z#0)))
 
 # ======== Church Numerals =================
 var zero = Abs("s", Abs("z", Var("z")))
@@ -211,6 +296,25 @@ var two   = App(suc, one)
 var three = App(suc, two)
 var four  = App(App(plus, two), two)
 var eight  = App(App(plus, four), four)
+
+var True = Abs("then", Abs("else", Var("then")))
+var False = Abs("then", Abs("else", Var("else")))
+var And = Abs("p", Abs("q", App(App(Var("p"), Var("q")), Var("p"))))
+
+# λg.(λx.g (x x)) (λx.g (x x))
+var Y = Abs("g",
+  App(
+    Abs("x", App(Var("g"), App(Var("x"), Var("x")))),
+    Abs("x", App(Var("g"), App(Var("x"), Var("x"))))
+  )
+)
+
+var p0 = App(App(And, True), False)
+var p1 = App(Y, Var("fun"))
+
+discard evaluate(p0, true)
+discard evaluate(p1, true, gas=2)
+
 
 discard evaluate(zero, true) # (\s.(\z.z))
 discard evaluate(one, true) # (\s.(\z.(s z)))
