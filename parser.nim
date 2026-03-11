@@ -14,7 +14,7 @@ import std/strformat
 
 const
   ws: set[char] = {' ', '\t'}
-  lowerCaseChar: set[char] = {'a'..'z'}
+  alphaChar: set[char] = {'a'..'z', 'A'..'Z'}
 
 type
   TokenKind = enum
@@ -57,7 +57,7 @@ proc untoken(t: var Tokenizer, tk: Token) =
 proc nextToken(t: var Tokenizer): Token =
   while t.ic < t.stream.len():
     case t.stream[t.ic]
-      of lowerCaseChar:
+      of alphaChar:
         let tk = t.identifier()
         return tk
       of '\\':
@@ -94,9 +94,9 @@ proc match(tokenizer: var Tokenizer, tkKind: TokenKind): string {.discardable.} 
 proc parseABS(tokenizer: var Tokenizer): Term
 
 proc parseF(tokenizer: var Tokenizer): Term =
-  echo fmt("F: enter {tokenizer.ic}")
+  # echo fmt("F: enter {tokenizer.ic}")
   var tk = tokenizer.nextToken()
-  echo fmt("F: next {tokenizer.ic} {tk.kind} {tk.data}")
+  # echo fmt("F: next {tokenizer.ic} {tk.kind} {tk.data}")
 
   case tk.kind:
     of VariableToken:
@@ -104,16 +104,16 @@ proc parseF(tokenizer: var Tokenizer): Term =
     of OpenToken:
       var ntk = parseABS(tokenizer)
       tokenizer.match(CloseToken)
-      echo fmt("F: exit {tokenizer.ic}")
+      # echo fmt("F: exit {tokenizer.ic}")
       return ntk
     else:
       raise newException(ParserError, fmt("[ERRO]: found {tk.kind} {tk.data} in {tokenizer.ic}"))
 
 proc parseAPP(tokenizer: var Tokenizer): Term =
-  echo fmt("APP: enter {tokenizer.ic}")
+  # echo fmt("APP: enter {tokenizer.ic}")
   var lhs = parseF(tokenizer)
   var tk = tokenizer.nextToken()
-  echo fmt("APP: next {tokenizer.ic} {tk.kind} {tk.data}")
+  # echo fmt("APP: next {tokenizer.ic} {tk.kind} {tk.data}")
 
   case tk.kind:
     of CloseToken:
@@ -124,13 +124,13 @@ proc parseAPP(tokenizer: var Tokenizer): Term =
     else:
       tokenizer.untoken(tk)
       var rhs = parseAPP(tokenizer)
-      echo fmt("APP: exit {tokenizer.ic}")
+      # echo fmt("APP: exit {tokenizer.ic}")
       return App(lhs, rhs)
   
 proc parseABS(tokenizer: var Tokenizer): Term =
-  echo fmt("ABS: enter {tokenizer.ic}")
+  # echo fmt("ABS: enter {tokenizer.ic}")
   var tk = tokenizer.nextToken()
-  echo fmt("ABS: next {tokenizer.ic} {tk.kind} {tk.data}")
+  # echo fmt("ABS: next {tokenizer.ic} {tk.kind} {tk.data}")
   var boundVarName: string
 
   case tk.kind:
@@ -138,16 +138,21 @@ proc parseABS(tokenizer: var Tokenizer): Term =
       boundVarName = tokenizer.match(VariableToken)
       tokenizer.match(DotToken)
       let body = parseABS(tokenizer)
-      echo fmt("ABS: exit {tokenizer.ic}")
+      # echo fmt("ABS: exit {tokenizer.ic}")
       return Abs(boundVarName, body)
     else:
       tokenizer.untoken(tk)
       var r = parseAPP(tokenizer)
-      echo fmt("ABS: exit {tokenizer.ic}")
+      # echo fmt("ABS: exit {tokenizer.ic}")
       return r
   
 
-proc parse(input: string): Term =
+proc parse*(input: string): Term =
   var tokenizer = Tokenizer(stream: input)
 
   return parseABS(tokenizer)
+
+# Using as lamb"str" does not require scaping
+# the \, but using as lamb("str") require
+proc lamb*(input: string): Term = 
+  return parse(input)

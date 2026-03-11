@@ -1,20 +1,5 @@
 import std/strformat
-import std/macros
 import definitions
-
-proc copyTerm(t: Term): Term =
-  case t.kind:
-    of VariableKind:
-      let v = Var(t.variable)
-      v.deBrujinId = t.deBrujinId
-      return v
-    of AbstractionKind:
-      return Abs(t.boundVar, copyTerm(t.body))
-    of ApplicationKind:
-      return App(
-        copyTerm(t.lhs),
-        copyTerm(t.rhs)
-      )
 
 proc bindVariables(t: var Term, boundVar: string, level: int = 0) =
   case t.kind

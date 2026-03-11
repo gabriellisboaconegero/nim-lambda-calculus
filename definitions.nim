@@ -1,4 +1,5 @@
 import std/strformat
+import std/tables
 
 type
   TermKind* = enum
@@ -41,3 +42,40 @@ proc toStr*(t: Term, fmtDeBrujin: bool = false): string =
       let strRhs = toStr(t.rhs, fmtDeBrujin)
       return fmt("({strLhs} {strRhs})")
 
+proc copyTerm*(t: Term): Term =
+  case t.kind:
+    of VariableKind:
+      let v = Var(t.variable)
+      v.deBrujinId = t.deBrujinId
+      return v
+    of AbstractionKind:
+      return Abs(t.boundVar, copyTerm(t.body))
+    of ApplicationKind:
+      return App(
+        copyTerm(t.lhs),
+        copyTerm(t.rhs)
+      )
+
+# To use wth fmt, so its like bindVars
+# Example:
+#   a = lamb"\x.x"
+#   b = lamb(fmt"\y.y {a}")
+proc `$`*(t: Term): string = 
+  return "(" & t.toStr() & ")"
+
+proc bindVars(t: Term, vars: Table[string, Term]): Term
+proc bindVars*(t: Term, vars: openArray[(string, Term)] = @[]): Term =
+  return t.bindVars(vars.toTable())
+
+proc bindVars(t: Term, vars: Table[string, Term]): Term =
+  case t.kind
+    of VariableKind:
+      if vars.hasKey(t.variable):
+        return vars[t.variable]
+      return t
+    of AbstractionKind:
+      if vars.hasKey(t.boundVar):
+        return t
+      return Abs(t.boundVar, t.body.bindVars(vars))
+    of ApplicationKind:
+      return App(t.lhs.bindVars(vars), t.rhs.bindVars(vars))

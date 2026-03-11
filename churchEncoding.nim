@@ -1,94 +1,43 @@
+import std/strformat
 import definitions
 import interpreter
+import parser
 
 # ======== Church Encoding =================
-var zero = Abs("s", Abs("z", Var("z")))
-var suc  = Abs("n",
-  Abs("s",
-    Abs("z",
-      App(
-        Var("s"),
-        App(
-          App(Var("n"), Var("s")),
-          Var("z")
-        )
-      )
-    )
-  )
-)
+var zero = lamb"\s.\z.z"
+var suc  = lamb"\n.\s.\z.s (n s) z"
 
-var plus = Abs("m",
-  Abs("n",
-    Abs("s",
-      Abs("z",
-        App(
-          App(Var("m"), Var("s")),
-          App(
-            App(Var("n"), Var("s")),
-            Var("z")
-          )
-        )
-      )
-    )
-  )
-)
+var plus = lamb"\m.\n.\s.\z. (m s) (n s) z"
+
 var one   = evaluate(App(suc, zero))
 var two   = evaluate(App(suc, one))
 var three = evaluate(App(suc, two))
 var four  = evaluate(App(App(plus, two), two))
 var eight = evaluate(App(App(plus, four), four))
 
-var True  = Abs("then", Abs("else", Var("then")))
-var False = Abs("then", Abs("else", Var("else")))
-var And   = Abs("p", Abs("q", App(App(Var("p"), Var("q")), Var("p"))))
-var If    = Abs("p", Abs("a", Abs("b", App(App(Var("p"), Var("a")), Var("b")))))
-var nIs0  = Abs("n", App(App(Var("n"), Abs("x", False)), True))
-var Pred  = Abs("n", Abs("f", Abs("x",
-  App(
-    App(
-      App(
-        Var("n"),
-        Abs("g", Abs("h",
-          App(Var("h"), App(Var("g"), Var("f")))
-        ))
-      ),
-      Abs("u", Var("x"))
-    ),
-    Abs("u", Var("u"))
-  )
-)))
+var True  = lamb"\then.\else.then"
+var False = lamb"\then.\else.else"
 
-var g = Abs("r", Abs("n",
-  App(
-    App(
-      App(nIs0, Var("n")),
-      zero
-    ),
-    App(
-      App(plus, Var("n")),
-      App(Var("r"), App(Pred, Var("n")))
-    )
-  )
-))
+var And   = lamb"\p.\q.(p q) p"
+var nIs0  = lamb(fmt"\n.(n (\x.{False})) {True}")
 
-# λg.(λx.g (x x)) (λx.g (x x))
-var Y = Abs("g",
-  App(
-    Abs("x", App(Var("g"), App(Var("x"), Var("x")))),
-    Abs("x", App(Var("g"), App(Var("x"), Var("x"))))
-  )
-)
+var Pred  = lamb"\n.\f.\x.n (\g.\h.h (g f)) (\u.x) (\u.u)"
+var g = lamb(fmt"\r.\n. ({nIs0} n {zero}) ({plus} n (r ({Pred} n)))")
+# var g = (lamb"\r.\n. (nIs0 n zero) (plus n (r (pred n)))")
+#           .bindVars({"nIs0": nIs0, "zero": zero, "plus": plus, "pred": Pred})
+
+var Y = lamb"\g.(\x.g (x x)) (\x.g (x x))"
 
 var G = App(Y, g) # Compute sum([0..n])
-var U = Abs("x", App(Var("x"), Var("x")))
-var OMEGA = App(U, U)
+var U = lamb"\x. x x"
+var OMEGA = lamb(fmt"{U} {U}")
 
-var p0 = App(App(And, True), False)
+var p0 = lamb(fmt"{And} {True} {False}")
 var p1 = App(Y, Var("fun"))
 var p2 = App(Pred, one)
 var p3 = App(nIs0, p2)
 var p4 = App(G, four)
-var p5 = App(Abs("x", Var("y")), OMEGA)
+var p5 = lamb(fmt"(\x.y) {OMEGA}")
 
 evaluate(p0, true)
 evaluate(p1, true, gas=2)
