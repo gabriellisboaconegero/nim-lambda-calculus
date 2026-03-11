@@ -16,21 +16,6 @@ proc copyTerm(t: Term): Term =
         copyTerm(t.rhs)
       )
 
-proc toStr*(t: Term, fmtDeBrujin: bool = false): string = 
-  case t.kind
-    of VariableKind:
-      if fmtDeBrujin:
-        return fmt("{t.variable}#{t.deBrujinId}")
-      else:
-        return t.variable
-    of AbstractionKind:
-      let bodyStr = toStr(t.body, fmtDeBrujin)
-      return fmt("(\\{t.boundVar}.{bodyStr})")
-    of ApplicationKind:
-      let strLhs = toStr(t.lhs, fmtDeBrujin)
-      let strRhs = toStr(t.rhs, fmtDeBrujin)
-      return fmt("({strLhs} {strRhs})")
-
 proc bindVariables(t: var Term, boundVar: string, level: int = 0) =
   case t.kind
     of VariableKind:
