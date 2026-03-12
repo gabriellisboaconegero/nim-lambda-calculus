@@ -120,7 +120,27 @@ proc reductionStep*(t: Term): Term =
     of ApplicationKind:
       return normalOrderRedux(t)
       # return applicativeOrderRedux(t)
+      #
+proc alphaEquivalenceDeBrujin(t0: Term, t1: Term): bool =
+  if t0.kind != t1.kind:
+    return false
 
+  case t0.kind
+    of VariableKind:
+      return t0.deBrujinId == t1.deBrujinId
+    of AbstractionKind:
+      return alphaEquivalenceDeBrujin(t0.body, t1.body)
+    of ApplicationKind:
+      return alphaEquivalenceDeBrujin(t0.lhs, t1.lhs) and alphaEquivalenceDeBrujin(t0.rhs, t1.rhs)
+
+proc alphaEquivalence*(t0: Term, t1: Term): bool =
+  var t0dbjiFixed = copyTerm(t0)
+  var t1dbjiFixed = copyTerm(t1)
+
+  t0dbjiFixed.fixDeBrujinRepresentation()
+  t1dbjiFixed.fixDeBrujinRepresentation()
+
+  return alphaEquivalenceDeBrujin(t0dbjiFixed, t1dbjiFixed)
 
 proc evaluate*(
     term: Term,

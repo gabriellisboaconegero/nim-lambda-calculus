@@ -1,5 +1,6 @@
 import definitions
 import interpreter
+import parser
 
 var t0 = Abs("x", Var("x"))
 var t1 = Abs("x", App(Var("x"), Var("y")))
@@ -87,4 +88,6 @@ evaluate(t10, true) # hey#0
 evaluate(t11, true) # (\x.(\z.((x#1 (\w.x#2)) z#0)))
 evaluate(t12, true) # (\y.((z#1 (\x.(w#2 x#0))) (\u.(u#0 (\x.(w#3 x#0))))))
 evaluate(t13, true) # (\x.(\z.((x#1 (w#2 x#1)) z#0)))
+echo alphaEquivalence(lamb"\x.x", lamb"\y.y")
+echo alphaEquivalence(lamb"\x.(\y.\z.l z) (\u.x)", lamb"\r.(\y.\p.k p) (\c.c)")
 
