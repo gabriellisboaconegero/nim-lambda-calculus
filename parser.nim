@@ -13,7 +13,7 @@ import std/strformat
 # F ::= VAR | (E)
 
 const
-  ws: set[char] = {' ', '\t'}
+  ws: set[char] = {' ', '\t', '\n'}
   alphaChar: set[char] = {'a'..'z', 'A'..'Z'}
 
 type

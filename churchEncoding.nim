@@ -3,34 +3,56 @@ import definitions
 import interpreter
 import parser
 
-# ======== Church Encoding =================
+# ======== Arithmetic =================
 var zero = lamb"\s.\z.z"
 var suc  = lamb"\n.\s.\z.s (n s) z"
 
 var plus = lamb"\m.\n.\s.\z. (m s) (n s) z"
+var mult = lamb"\m.\n.\f.m (n f)"
+var Pred  = lamb"\n.\f.\x.n (\g.\h.h (g f)) (\u.x) (\u.u)"
 
 var one   = evaluate(App(suc, zero))
 var two   = evaluate(App(suc, one))
 var three = evaluate(App(suc, two))
 var four  = evaluate(App(App(plus, two), two))
 var eight = evaluate(App(App(plus, four), four))
+# ======== Arithmetic =================
 
+# ======== Logic =================
 var True  = lamb"\then.\else.then"
 var False = lamb"\then.\else.else"
 
-var And   = lamb"\p.\q.(p q) p"
+var And   = lamb"\p.\q.p q p"
+var Or    = lamb"\p.\q.p p q"
+var Not   = (lamb"\p.\q.F T").bindVars({"F": False, "T": True})
 var nIs0  = lamb(fmt"\n.(n (\x.{False})) {True}")
+# ======== Logic =================
 
-var Pred  = lamb"\n.\f.\x.n (\g.\h.h (g f)) (\u.x) (\u.u)"
+# ============= Pairs ============
+var Pair    = lamb"\x.\y.\f. f x y"
+var First   = lamb"\p. p (\x.\y.x)"
+var Second  = lamb"\p. p (\x.\y.y)"
+var NIL     = lamb"\f. T".bindVars({"T": True})
+var NULL    = lamb"\p. p (\x.\y.F)".bindVars({"F": False})
+# ============= Pairs ============
+
+# ============ Combinators ==========
+var I = lamb"\x.x"
+var S = lamb"\x.\y.\z.x z (y z)"
+var K = lamb"\x.\y.x"
+var B = lamb"\x.\y.\z.x (y z)"
+var C = lamb"\x.\y.\z.x z y"
+var W = lamb"\x.\y.\z.x y y"
+var Y = lamb"\g.(\x.g (x x)) (\x.g (x x))"
+var U = lamb"\x. x x"
+var OMEGA = lamb(fmt"{U} {U}")
+# ============ Combinators ==========
+
 var g = lamb(fmt"\r.\n. ({nIs0} n {zero}) ({plus} n (r ({Pred} n)))")
 # var g = (lamb"\r.\n. (nIs0 n zero) (plus n (r (pred n)))")
 #           .bindVars({"nIs0": nIs0, "zero": zero, "plus": plus, "pred": Pred})
 
-var Y = lamb"\g.(\x.g (x x)) (\x.g (x x))"
-
 var G = App(Y, g) # Compute sum([0..n])
-var U = lamb"\x. x x"
-var OMEGA = lamb(fmt"{U} {U}")
 
 var p0 = lamb(fmt"{And} {True} {False}")
 var p1 = App(Y, Var("fun"))
